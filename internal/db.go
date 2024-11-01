@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"regexp"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql" // mysql driver
 )
@@ -13,6 +15,8 @@ type MyDb struct {
 	Db     *sql.DB
 	dbType string
 }
+
+var dataDirectoryRe = regexp.MustCompile(`(?m)DATA DIRECTORY = '.+'`)
 
 // NewMyDb parse dsn
 func NewMyDb(dsn string, dbType string) *MyDb {
@@ -78,6 +82,18 @@ func (db *MyDb) GetTableSchema(name string) (schema string) {
 			panic(fmt.Sprintf("get table %s 's schema failed, %s", name, err))
 		}
 	}
+
+	lines := []string{}
+	for _, line := range strings.Split(schema, "\n") {
+		if strings.Contains(line, "timestamp") || strings.Contains(line, "datetime") {
+			lines = append(lines, strings.Replace(line, "DEFAULT '0000-00-00 00:00:00'", "DEFAULT CURRENT_TIMESTAMP", -1))
+		} else {
+			lines = append(lines, line)
+		}
+	}
+
+	schema = strings.Join(lines, "\n")
+	schema = dataDirectoryRe.ReplaceAllString(schema, "")
 	return
 }
 
